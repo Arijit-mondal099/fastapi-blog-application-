@@ -88,6 +88,11 @@ class InvalidTagName(AppError):
     default_detail = "Tag names must be between 1 and 30 characters"
 
 
+class InvalidSearchQuery(AppError):
+    status_code = 422
+    default_detail = "Search query must be between 1 and 200 characters"
+
+
 class CannotDemoteSelf(AppError):
     status_code = 409
     default_detail = "Admins cannot demote themselves"

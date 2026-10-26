@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.post import Post, PostStatus, PostTag, Tag
@@ -103,6 +103,41 @@ class PostRepository:
         statement = statement.order_by(Post.created_at.desc(), Post.id.desc()).limit(limit)
         posts = await self._session.scalars(statement)
         return list(posts.all())
+
+    async def search(
+        self,
+        *,
+        query: str,
+        after: tuple[float, datetime, UUID] | None,
+        limit: int,
+    ) -> list[tuple[Post, float]]:
+        tsquery = func.websearch_to_tsquery("english", query)
+        rank = func.ts_rank(Post.search_vector, tsquery)
+        statement = select(Post, rank.label("rank")).where(
+            Post.status == PostStatus.published,
+            Post.published_at.is_not(None),
+            Post.search_vector.op("@@")(tsquery),
+        )
+        if after is not None:
+            rank_value, published_at, post_id = after
+            statement = statement.where(
+                or_(
+                    rank < rank_value,
+                    and_(rank == rank_value, Post.published_at < published_at),
+                    and_(
+                        rank == rank_value,
+                        Post.published_at == published_at,
+                        Post.id < post_id,
+                    ),
+                )
+            )
+        statement = statement.order_by(
+            rank.desc(),
+            Post.published_at.desc(),
+            Post.id.desc(),
+        ).limit(limit)
+        rows = await self._session.execute(statement)
+        return [(post, float(rank_value)) for post, rank_value in rows.all()]
 
     async def update_content(
         self,

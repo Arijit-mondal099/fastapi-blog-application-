@@ -21,6 +21,7 @@ Terms used consistently across code, API, and docs. Updated as decisions are mad
 | **Worker** | The separate ARQ process that runs Jobs. Shares models and DB session code with the API. |
 | **Post** | A blog article owned by exactly one Author. Lifecycle: `draft` → `published` → `archived`. Has a unique slug. |
 | **Tag** | A label on Posts, many-to-many, created by Authors. |
+| **Search** | Public ranked lookup over published Posts using Postgres full-text search on title and body. |
 | **Comment** | A flat (non-threaded) reply to a Post by any signed-in User. |
 
 _Out of v1 (deferred): likes, bookmarks, follows, view counts, nested comments, notifications, RSS, scheduled publishing, revision history._

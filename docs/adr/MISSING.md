@@ -25,3 +25,6 @@ supplied with that task because these ADR files remain absent.
 
 Phase 3 (posts, tags, and public reads) also proceeded against the decision index
 and the rules supplied with that task because these ADR files remain absent.
+
+Phase 4 (full-text search) also proceeded against the decision index and the rules
+supplied with that task because these ADR files remain absent.

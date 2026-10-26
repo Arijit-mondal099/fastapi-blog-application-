@@ -4,8 +4,8 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Text, func
-from sqlalchemy.dialects.postgresql import CITEXT
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Text, func
+from sqlalchemy.dialects.postgresql import CITEXT, TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -38,6 +38,7 @@ class Post(Base):
     """A blog article owned by one author."""
 
     __tablename__ = "posts"
+    __table_args__ = (Index("ix_posts_search_vector", "search_vector", postgresql_using="gin"),)
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     author_id: Mapped[UUID] = mapped_column(
@@ -49,6 +50,7 @@ class Post(Base):
     slug: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     body_md: Mapped[str] = mapped_column(Text, nullable=False)
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     status: Mapped[PostStatus] = mapped_column(
         Enum(PostStatus, name="post_status", values_callable=_status_values),
         nullable=False,

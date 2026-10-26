@@ -10,6 +10,7 @@ from redis.asyncio import Redis
 from app.api.v1.admin import router as admin_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.posts import router as posts_router
+from app.api.v1.search import router as search_router
 from app.api.v1.tags import router as tags_router
 from app.core.config import get_settings
 from app.core.deps import CurrentUser, require_role
@@ -41,6 +42,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(posts_router)
+    app.include_router(search_router)
     app.include_router(tags_router)
 
     @app.get("/health")

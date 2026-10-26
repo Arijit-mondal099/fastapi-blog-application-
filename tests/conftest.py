@@ -39,13 +39,13 @@ from tests.helpers import FakeGoogleClient, FakeRedis  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _run_migrations(database_url: str) -> None:
+def _run_migrations(database_url: str, revision: str = "head") -> None:
     previous = os.environ.get("DATABASE_URL")
     os.environ["DATABASE_URL"] = database_url
     get_settings.cache_clear()
     try:
         config = Config(str(ROOT / "alembic.ini"))
-        command.upgrade(config, "head")
+        command.upgrade(config, revision)
     finally:
         get_settings.cache_clear()
         if previous is None:

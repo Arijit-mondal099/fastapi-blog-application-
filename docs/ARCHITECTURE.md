@@ -108,7 +108,7 @@ comments                                      -- flat, no threading
 
 Indexes that matter: `posts(status, published_at desc, id)` for cursor pagination; GIN on `search_vector`; `posts(author_id)`; `comments(post_id, created_at)`; `refresh_tokens(family_id)`; `media(status, created_at)` for the orphan sweep.
 
-Phase 3 implements `posts`, `tags`, and `post_tags` without `cover_media_id` or `search_vector`; those columns arrive with media (Phase 6) and search (Phase 4).
+Phase 3 implements `posts`, `tags`, and `post_tags`. Phase 4 adds `search_vector`, its GIN index, and the trigger that maintains it. `cover_media_id` arrives with media (Phase 6).
 
 Open schema question: `media.status` includes `pending_delete` for the outbox pattern (ADR-0007), which is still a proposal.
 
@@ -151,7 +151,7 @@ Open schema question: `media.status` includes `pending_delete` for the outbox pa
 - `GET /posts/{slug}`: published posts are public. A draft or archived post is returned only to its owner or an Admin; every other caller gets 404.
 - `GET /tags`: every tag with a count of published posts only.
 - `POST /posts`, `PATCH /posts/{id}`, publish, archive, and delete require the owner or an Admin. A non-owner gets 403 when the post is published and 404 when it is a draft or archived post they cannot see. `GET /me/posts` returns the caller's own posts in every status.
-- `GET /search?q=`: `websearch_to_tsquery` over `search_vector`, ranked, paginated. Planned for Phase 4.
+- `GET /search?q=`: public search over `search_vector` using `websearch_to_tsquery('english', q)`. Title is weighted A and `body_md` B. Only published posts with a `published_at` are searchable. Results are ranked by `ts_rank` descending, then `published_at` descending, then `id` descending, and paginated by an opaque cursor containing all three. `q` is trimmed and must be 1 to 200 characters; a stop-word-only query returns an empty page. `limit` defaults to 20 and is capped at 50. Results return `id`, `title`, `slug`, `excerpt` (first 200 characters of `body_md`), `published_at`, and `rank`, never `body_md`.
 - Anonymous reads hit Postgres directly. Caching is a Phase 8 concern.
 
 ### 4.7 Admin user management
