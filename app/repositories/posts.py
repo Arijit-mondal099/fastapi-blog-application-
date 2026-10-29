@@ -157,6 +157,11 @@ class PostRepository:
         post.tags = list(tags)
         await self._session.flush()
 
+    async def set_cover(self, post: Post, cover_media_id: UUID | None) -> None:
+        post.cover_media_id = cover_media_id
+        await self._session.flush()
+        await self._session.refresh(post, attribute_names=["updated_at"])
+
     async def set_status(
         self,
         post: Post,

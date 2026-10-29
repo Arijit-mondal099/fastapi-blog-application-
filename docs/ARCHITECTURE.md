@@ -108,7 +108,7 @@ comments                                      -- flat, no threading
 
 Indexes that matter: `posts(status, published_at desc, id)` for cursor pagination; GIN on `search_vector`; `posts(author_id)`; `comments(post_id, created_at, id)` for comment listing; `comments(author_id)`; `refresh_tokens(family_id)`; `media(status, created_at)` for the orphan sweep.
 
-Phase 3 implements `posts`, `tags`, and `post_tags`. Phase 4 adds `search_vector`, its GIN index, and the trigger that maintains it. Phase 5 implements `comments`. `cover_media_id` arrives with media (Phase 6).
+Phase 3 implements `posts`, `tags`, and `post_tags`. Phase 4 adds `search_vector`, its GIN index, and the trigger that maintains it. Phase 5 implements `comments`. Phase 6 implements `media` and `posts.cover_media_id`; media verification and deletion remain Phase 7 work.
 
 Open schema question: `media.status` includes `pending_delete` for the outbox pattern (ADR-0007), which is still a proposal.
 
@@ -134,11 +134,11 @@ Open schema question: `media.status` includes `pending_delete` for the outbox pa
 - Effective role changes reach regular routes within one access-token lifetime (about 15 minutes).
 
 ### 4.4 Create a post with a cover image (ADR-0006)
-1. `GET /media/upload-auth` returns signed params (signature, token, expire) and allowed types and size.
+1. `GET /media/upload-auth` returns signed params (signature, token, expire), the public key, a per-user upload folder, and a backend-chosen file name. The expiry defaults to 300 seconds and is clamped to 3600. Only authors and admins may request it.
 2. The browser uploads the file to ImageKit and gets `file_id` and `url`.
-3. `POST /media` (confirm) records a Media row with status `pending`.
-4. `POST /posts` attaches the Media by `cover_media_id`. The service checks that the Media's owner is the caller.
-5. The worker job `verify_media` checks the file through the ImageKit API, then sets status `verified`.
+3. `POST /media` (confirm) records a Media row with status `pending`, owned by the caller. It rejects an empty MIME type or a size of zero or less.
+4. `PATCH /posts/{id}` attaches the Media by `cover_media_id`, or clears it with `null`. The service checks that the Post is owned by the caller or the caller is an Admin, and that the Media is owned by the caller or the caller is an Admin; an unowned Media returns 404 so its existence is not revealed.
+5. The worker job `verify_media` checks the file through the ImageKit API, then sets status `verified`. Until that Phase 7 job exists, the ImageKit upload-auth signature does not bind file type, size, folder, or file name, so those values are guidance rather than enforcement.
 
 ### 4.5 Delete a post (ADR-0007, outbox proposed)
 1. In one DB transaction: delete or archive the Post, and set its Media rows to `pending_delete`.

@@ -6,13 +6,16 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.deps import CurrentUser, get_optional_current_user, require_role
 from app.db.session import get_db_session
 from app.models.post import Post
 from app.models.user import Role
+from app.repositories.media import MediaRepository
 from app.repositories.posts import PostRepository
 from app.repositories.tags import TagRepository
 from app.schemas.posts import PostCreate, PostListResponse, PostResponse, PostUpdate
+from app.services.media import MediaService
 from app.services.posts import PostService
 from app.services.tags import TagService
 
@@ -23,9 +26,16 @@ def get_post_service(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> PostService:
     """Build the post service for one request."""
+    posts = PostRepository(session)
     return PostService(
-        posts=PostRepository(session),
+        posts=posts,
         tags=TagService(tags=TagRepository(session)),
+        media=MediaService(
+            media=MediaRepository(session),
+            posts=posts,
+            session=session,
+            settings=get_settings(),
+        ),
         session=session,
     )
 
@@ -92,7 +102,7 @@ async def update_post(
     actor: Annotated[CurrentUser, Depends(require_role(Role.author))],
     service: Annotated[PostService, Depends(get_post_service)],
 ) -> Post:
-    """Edit title, body, or tags; the slug never changes."""
+    """Edit title, body, tags, or cover; the slug never changes."""
     return await service.update(
         actor_id=actor.id,
         actor_role=actor.role,
@@ -100,6 +110,8 @@ async def update_post(
         title=body.title,
         body_md=body.body_md,
         tag_names=body.tags,
+        cover_media_id=body.cover_media_id,
+        cover_provided="cover_media_id" in body.model_fields_set,
     )
 
 

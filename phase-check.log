@@ -1,0 +1,29 @@
+﻿Phase 6 verification log
+docs/check-phase.sh is absent from this repository; the equivalent commands were run.
+
+=== pytest -q ===
+........................................................................ [ 64%]
+.......................................                                  [100%]
+111 passed in 92.09s (0:01:32)
+=== ruff check . ===
+All checks passed!
+=== ruff format --check . ===
+93 files already formatted
+=== mypy app ===
+Success: no issues found in 57 source files
+=== alembic upgrade head ===
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+=== alembic downgrade -1 ===
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running downgrade 0006_media -> 0005_comments, Create media and add posts.cover_media_id.
+=== alembic upgrade head (again) ===
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade 0005_comments -> 0006_media, Create media and add posts.cover_media_id.
+=== alembic current ===
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+0006_media (head)
+All Phase 6 checks passed.

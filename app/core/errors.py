@@ -108,6 +108,26 @@ class InvalidCommentBody(AppError):
     default_detail = "Comment body must be between 1 and 2000 characters"
 
 
+class MediaNotFound(AppError):
+    status_code = 404
+    default_detail = "Media not found"
+
+
+class MediaAlreadyExists(AppError):
+    status_code = 409
+    default_detail = "Media already exists"
+
+
+class InvalidMediaMetadata(AppError):
+    status_code = 422
+    default_detail = "Media mime type and size are required"
+
+
+class ImageKitNotConfigured(AppError):
+    status_code = 503
+    default_detail = "ImageKit is not configured"
+
+
 class CannotDemoteSelf(AppError):
     status_code = 409
     default_detail = "Admins cannot demote themselves"

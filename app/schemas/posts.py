@@ -23,6 +23,7 @@ class PostUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1)
     body_md: str | None = None
     tags: list[str] | None = None
+    cover_media_id: UUID | None = None
 
 
 class PostResponse(BaseModel):
@@ -36,6 +37,7 @@ class PostResponse(BaseModel):
     title: str
     body_md: str
     status: PostStatus
+    cover_media_id: UUID | None
     published_at: datetime | None
     created_at: datetime
     updated_at: datetime

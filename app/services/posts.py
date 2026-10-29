@@ -20,6 +20,7 @@ from app.core.errors import (
 from app.models.post import Post, PostStatus
 from app.models.user import Role
 from app.repositories.posts import PostRepository
+from app.services.media import MediaService
 from app.services.slugs import slugify
 from app.services.tags import TagService
 
@@ -52,11 +53,13 @@ class PostService:
         *,
         posts: PostRepository,
         tags: TagService,
+        media: MediaService,
         session: AsyncSession,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._posts = posts
         self._tags = tags
+        self._media = media
         self._session = session
         self._clock = clock or (lambda: datetime.now(UTC))
 
@@ -92,14 +95,24 @@ class PostService:
         title: str | None,
         body_md: str | None,
         tag_names: Sequence[str] | None,
+        cover_media_id: UUID | None = None,
+        cover_provided: bool = False,
     ) -> Post:
-        """Edit a post without changing its slug."""
+        """Edit a post without changing its slug, optionally replacing its cover."""
         self._require_writer(actor_role)
         post = await self._get_for_write(post_id, actor_id=actor_id, actor_role=actor_role)
         tags = await self._tags.find_or_create(tag_names) if tag_names is not None else None
         await self._posts.update_content(post, title=title, body_md=body_md)
         if tags is not None:
             await self._posts.replace_tags(post, tags)
+        if cover_provided:
+            post = await self._media.attach_cover(
+                actor_id=actor_id,
+                actor_role=actor_role,
+                post_id=post_id,
+                media_id=cover_media_id,
+                commit=False,
+            )
         await self._session.commit()
         return post
 

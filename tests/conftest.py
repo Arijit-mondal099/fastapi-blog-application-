@@ -29,6 +29,9 @@ os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test-client-secret")
 os.environ.setdefault("FRONTEND_URL", "https://frontend.test")
 os.environ.setdefault("POST_LOGIN_PATH", "/")
 os.environ.setdefault("ADMIN_EMAILS", "admin@example.com")
+os.environ.setdefault("IMAGEKIT_PUBLIC_KEY", "test-imagekit-public-key")
+os.environ.setdefault("IMAGEKIT_PRIVATE_KEY", "test-imagekit-private-key")
+os.environ.setdefault("IMAGEKIT_URL_ENDPOINT", "https://ik.imagekit.io/test")
 
 from app.core.config import get_settings  # noqa: E402
 from app.db.session import get_db_session  # noqa: E402
@@ -70,7 +73,7 @@ async def db_engine(postgres_url: str) -> AsyncIterator[AsyncEngine]:
     async with engine.begin() as connection:
         await connection.execute(
             text(
-                "TRUNCATE TABLE post_tags, posts, tags, comments, refresh_tokens, users "
+                "TRUNCATE TABLE post_tags, comments, posts, media, tags, refresh_tokens, users "
                 "RESTART IDENTITY CASCADE"
             )
         )
@@ -111,6 +114,9 @@ def auth_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setenv("ADMIN_EMAILS", "admin@example.com")
     monkeypatch.setenv("COOKIE_DOMAIN", "")
     monkeypatch.setenv("TRUSTED_PROXY_COUNT", "0")
+    monkeypatch.setenv("IMAGEKIT_PUBLIC_KEY", "test-imagekit-public-key")
+    monkeypatch.setenv("IMAGEKIT_PRIVATE_KEY", "test-imagekit-private-key")
+    monkeypatch.setenv("IMAGEKIT_URL_ENDPOINT", "https://ik.imagekit.io/test")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

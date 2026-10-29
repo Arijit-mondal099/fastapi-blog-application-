@@ -31,3 +31,6 @@ supplied with that task because these ADR files remain absent.
 
 Phase 5 (comments) also proceeded against the decision index and the rules
 supplied with that task because these ADR files remain absent.
+
+Phase 6 (media and ImageKit upload) also proceeded against the decision index
+and the rules supplied with that task because these ADR files remain absent.

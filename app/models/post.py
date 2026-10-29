@@ -57,6 +57,10 @@ class Post(Base):
         default=PostStatus.draft,
         server_default=PostStatus.draft.value,
     )
+    cover_media_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("media.id", ondelete="SET NULL"),
+    )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
