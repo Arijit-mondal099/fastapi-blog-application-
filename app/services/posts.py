@@ -165,12 +165,18 @@ class PostService:
         actor_id: UUID,
         actor_role: Role,
         post_id: UUID,
+        request_id: str | None = None,
     ) -> None:
-        """Delete a post; association rows cascade and tags remain."""
+        """Delete a post, queueing its cover Media for remote deletion after commit."""
         self._require_writer(actor_role)
         post = await self._get_for_write(post_id, actor_id=actor_id, actor_role=actor_role)
+        media_ids = [post.cover_media_id] if post.cover_media_id is not None else []
+        if media_ids:
+            await self._media.mark_for_deletion(media_ids)
         await self._posts.delete(post)
         await self._session.commit()
+        if media_ids:
+            await self._media.enqueue_deletions(media_ids, request_id=request_id)
 
     async def get_by_slug(
         self,

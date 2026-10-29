@@ -2,12 +2,13 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.deps import CurrentUser, require_role
 from app.db.session import get_db_session
+from app.jobs.queue import JobQueue, get_job_queue
 from app.models.media import Media
 from app.models.user import Role
 from app.repositories.media import MediaRepository
@@ -20,6 +21,7 @@ router = APIRouter(tags=["media"])
 
 def get_media_service(
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    queue: Annotated[JobQueue, Depends(get_job_queue)],
 ) -> MediaService:
     """Build the media service for one request."""
     return MediaService(
@@ -27,6 +29,7 @@ def get_media_service(
         posts=PostRepository(session),
         session=session,
         settings=get_settings(),
+        queue=queue,
     )
 
 
@@ -56,6 +59,7 @@ async def get_upload_auth(
 
 @router.post("/media", response_model=MediaResponse, status_code=201)
 async def confirm_media(
+    request: Request,
     body: MediaConfirmRequest,
     actor: Annotated[CurrentUser, Depends(require_role(Role.author))],
     service: Annotated[MediaService, Depends(get_media_service)],
@@ -68,4 +72,5 @@ async def confirm_media(
         url=body.url,
         mime_type=body.mime_type,
         size_bytes=body.size_bytes,
+        request_id=getattr(request.state, "request_id", None),
     )

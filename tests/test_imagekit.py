@@ -83,3 +83,28 @@ async def test_get_file_details_raises_on_server_error() -> None:
         client = ImageKitClient(_settings(), http_client=http_client)
         with pytest.raises(ImageKitClientError):
             await client.get_file_details("file-1")
+
+
+async def test_delete_file_treats_missing_files_as_success() -> None:
+    """ImageKit deletion is idempotent, so a 404 is not an error."""
+    seen: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, str(request.url)))
+        return httpx.Response(404, json={})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http_client:
+        client = ImageKitClient(_settings(), http_client=http_client)
+        await client.delete_file("missing")
+
+    assert seen == [("DELETE", "https://api.imagekit.io/v1/files/missing")]
+
+
+async def test_delete_file_raises_on_server_error() -> None:
+    """Transient ImageKit deletion failures are surfaced for retries."""
+    transport = httpx.MockTransport(lambda request: httpx.Response(500, json={}))
+    async with httpx.AsyncClient(transport=transport) as http_client:
+        client = ImageKitClient(_settings(), http_client=http_client)
+        with pytest.raises(ImageKitClientError):
+            await client.delete_file("file-1")

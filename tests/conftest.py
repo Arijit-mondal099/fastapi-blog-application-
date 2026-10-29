@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 from testcontainers.community.postgres import PostgresContainer
+from testcontainers.community.redis import RedisContainer
 
 # Set a valid test configuration before importing the application module, which
 # builds the module-level FastAPI app and validates JWT_SECRET at import time.
@@ -37,7 +38,7 @@ from app.core.config import get_settings  # noqa: E402
 from app.db.session import get_db_session  # noqa: E402
 from app.integrations.google_oauth import get_google_oauth_client  # noqa: E402
 from app.main import create_app  # noqa: E402
-from tests.helpers import FakeGoogleClient, FakeRedis  # noqa: E402
+from tests.helpers import FakeGoogleClient, FakeJobQueue, FakeRedis  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -64,6 +65,15 @@ def postgres_url() -> Iterator[str]:
         url = container.get_connection_url()
         _run_migrations(url)
         yield url
+
+
+@pytest.fixture(scope="session")
+def redis_url() -> Iterator[str]:
+    """Start one real Redis container for worker integration tests."""
+    with RedisContainer("redis:7-alpine") as container:
+        host = container.get_container_host_ip()
+        port = container.get_exposed_port(6379)
+        yield f"redis://{host}:{port}/0"
 
 
 @pytest_asyncio.fixture
@@ -100,6 +110,11 @@ def fake_redis() -> FakeRedis:
     return FakeRedis()
 
 
+@pytest.fixture
+def fake_job_queue() -> FakeJobQueue:
+    return FakeJobQueue()
+
+
 @pytest.fixture(autouse=True)
 def auth_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Apply deterministic auth settings for every test."""
@@ -128,6 +143,7 @@ async def app(
     db_session: AsyncSession,
     fake_google: FakeGoogleClient,
     fake_redis: FakeRedis,
+    fake_job_queue: FakeJobQueue,
 ) -> AsyncIterator[FastAPI]:
     application = create_app()
 
@@ -137,6 +153,7 @@ async def app(
     application.dependency_overrides[get_db_session] = override_session
     application.dependency_overrides[get_google_oauth_client] = lambda: fake_google
     application.state.redis = fake_redis
+    application.state.job_queue = fake_job_queue
     try:
         yield application
     finally:

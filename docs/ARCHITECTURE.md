@@ -1,6 +1,6 @@
 # Architecture: Blog Backend
 
-Status: v1 design. Decisions live in `adr/`. Terms live in `CONTEXT.md`.
+Status: Phases 0-7 implemented; v1 design. Decisions live in `adr/`. Terms live in `CONTEXT.md`. Phase 8 (hardening) and Phase 9 (deployment) remain.
 
 ## 1. System overview
 
@@ -108,9 +108,9 @@ comments                                      -- flat, no threading
 
 Indexes that matter: `posts(status, published_at desc, id)` for cursor pagination; GIN on `search_vector`; `posts(author_id)`; `comments(post_id, created_at, id)` for comment listing; `comments(author_id)`; `refresh_tokens(family_id)`; `media(status, created_at)` for the orphan sweep.
 
-Phase 3 implements `posts`, `tags`, and `post_tags`. Phase 4 adds `search_vector`, its GIN index, and the trigger that maintains it. Phase 5 implements `comments`. Phase 6 implements `media` and `posts.cover_media_id`; media verification and deletion remain Phase 7 work.
+Phase 3 implements `posts`, `tags`, and `post_tags`. Phase 4 adds `search_vector`, its GIN index, and the trigger that maintains it. Phase 5 implements `comments`. Phase 6 implements `media` and `posts.cover_media_id`. Phase 7 implements media verification, media deletion, and the outbox pattern.
 
-Open schema question: `media.status` includes `pending_delete` for the outbox pattern (ADR-0007), which is still a proposal.
+`media.status` includes `pending_delete` for the outbox pattern (ADR-0007), implemented in Phase 7.
 
 ## 4. Key flows
 
@@ -138,13 +138,13 @@ Open schema question: `media.status` includes `pending_delete` for the outbox pa
 2. The browser uploads the file to ImageKit and gets `file_id` and `url`.
 3. `POST /media` (confirm) records a Media row with status `pending`, owned by the caller. It rejects an empty MIME type or a size of zero or less.
 4. `PATCH /posts/{id}` attaches the Media by `cover_media_id`, or clears it with `null`. The service checks that the Post is owned by the caller or the caller is an Admin, and that the Media is owned by the caller or the caller is an Admin; an unowned Media returns 404 so its existence is not revealed.
-5. The worker job `verify_media` checks the file through the ImageKit API, then sets status `verified`. Until that Phase 7 job exists, the ImageKit upload-auth signature does not bind file type, size, folder, or file name, so those values are guidance rather than enforcement.
+5. The worker job `verify_media` checks the file through the ImageKit API, then sets status `verified` when the MIME type is in `MEDIA_ALLOWED_MIME_TYPES` and the size is within `MEDIA_MAX_SIZE_BYTES`. A rejected file moves to `pending_delete` and a `delete_remote_media` job removes it; it becomes `deleted` only after ImageKit confirms the delete. A file missing from ImageKit is recorded as `deleted`. The upload-auth signature still does not bind file type, size, folder, or file name, so those values are guidance at upload time; the job enforces the MIME and size rules after upload.
 
-### 4.5 Delete a post (ADR-0007, outbox proposed)
-1. In one DB transaction: delete or archive the Post, and set its Media rows to `pending_delete`.
-2. After commit, enqueue `delete_remote_media` for each Media.
-3. The job calls ImageKit, retries on failure, and marks the row `deleted` on success. Jobs are idempotent.
-4. The scheduled `sweep_orphans` re-enqueues any row still in `pending_delete`, and deletes `pending` rows older than 24 hours that are unreferenced.
+### 4.5 Delete a post (ADR-0007, outbox confirmed)
+1. In one DB transaction: delete the Post and set its cover Media to `pending_delete`.
+2. After commit, enqueue `delete_remote_media` for each Media. An enqueue failure is logged and does not fail the request.
+3. The job calls ImageKit, retries with exponential backoff, and marks the row `deleted` on success. An ImageKit 404 for an already-missing file counts as success. Jobs are idempotent.
+4. The scheduled `sweep_orphans` re-enqueues any row still in `pending_delete`, and marks unreferenced `pending` rows older than 24 hours as `pending_delete` before enqueueing their deletion.
 
 ### 4.6 Public reads, post management, and search
 - `GET /posts`: published only, cursor pagination on `(published_at, id)`, filters `tag` (tag slug) and `author` (author id), sort newest first.
@@ -170,15 +170,17 @@ Open schema question: `media.status` includes `pending_delete` for the outbox pa
 
 | Job | Trigger | Retries | Idempotency |
 |-----|---------|---------|-------------|
-| `delete_remote_media` | enqueued after post or user delete | 5, exponential backoff | ImageKit delete ignores already-deleted files |
-| `verify_media` | enqueued after Media confirm | 3 | Re-check sets the same status |
-| `sweep_orphans` | cron, hourly | none (next run retries) | Only acts on rows in the target state |
-| `purge_expired_refresh_tokens` | cron, daily | none | Deletes rows where `expires_at < now()` |
+| `delete_remote_media` | enqueued after post delete; re-enqueued by the sweep | 5, exponential backoff | Already-deleted rows are skipped; ImageKit 404 counts as success |
+| `verify_media` | enqueued after Media confirm | 3, exponential backoff | Only acts on rows still `pending`; re-checks set the same status |
+| `sweep_orphans` | cron, hourly at minute 0 | none (next run retries) | Only acts on rows in the target state |
+| `purge_expired_refresh_tokens` | cron, daily at 03:00 | none | Deletes rows where `expires_at < now()`, plus revoked rows past the refresh-token retention window |
+
+Jobs call services, never repositories. Job functions accept an optional originating request ID and bind it to the logging context, so worker log lines carry the same `request_id` as the HTTP request that enqueued them. Job arguments are IDs, never ORM objects.
 
 ## 6. Cross-cutting concerns
 - **Config:** pydantic-settings, environment only. Secrets never in the repo. See `.env.example`.
 - **Errors:** domain exceptions map to HTTP codes in one place (`core/errors.py`). Responses never leak stack traces.
-- **Logging:** structured JSON with a request ID propagated to jobs.
+- **Logging:** structured JSON. The API accepts `X-Request-ID` (up to 128 characters) or generates one, returns it in the response, and passes it to enqueued jobs so worker logs keep the originating ID.
 - **Security:** CORS allows only the frontend origin with credentials. Auth routes are limited to 60 requests per minute per client IP and route, backed by Redis, and fail closed with 503 if Redis is unavailable. `X-Forwarded-For` is trusted only when `TRUSTED_PROXY_COUNT > 0`. Strict cookies and non-GET methods for state changes provide CSRF protection.
 - **Migrations:** Alembic only. The release step runs `alembic upgrade head` before new code takes traffic.
 - **Testing:** unit tests for services. Integration tests against real Postgres (testcontainers). Job tests run the worker function directly, including a double-run idempotency test.
@@ -199,10 +201,9 @@ Open schema question: `media.status` includes `pending_delete` for the outbox pa
 | 0004 | Cookie delivery, SameSite=Strict | Accepted, revisit if domains split |
 | 0005 | Backend-driven Google OAuth keyed by `sub` | Accepted |
 | 0006 | Direct browser-to-ImageKit upload | Accepted |
-| 0007 | ARQ with Redis; outbox via `pending_delete` | ARQ accepted; outbox proposed |
+| 0007 | ARQ with Redis; outbox via `pending_delete` | Accepted; implemented in Phase 7 |
 | 0008 | v1 feature scope | Accepted |
 
 ## 9. Open items
-1. Confirm the outbox pattern in ADR-0007 (affects `media.status` and the sweep job).
-2. Confirm the frontend and API share a site. If not, ADR-0004 changes.
-3. Choose the hosting provider (affects managed Postgres and Redis choice).
+1. Confirm the frontend and API share a site. If not, ADR-0004 changes.
+2. Choose the hosting provider (affects managed Postgres and Redis choice).

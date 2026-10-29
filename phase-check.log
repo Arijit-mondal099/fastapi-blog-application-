@@ -1,16 +1,14 @@
-﻿Phase 6 verification log
+﻿Phase 7 verification log
 docs/check-phase.sh is absent from this repository; the equivalent commands were run.
 
 === pytest -q ===
-........................................................................ [ 64%]
-.......................................                                  [100%]
-111 passed in 92.09s (0:01:32)
+131 passed in 150.01s (0:02:30)
 === ruff check . ===
 All checks passed!
 === ruff format --check . ===
-93 files already formatted
+99 files already formatted
 === mypy app ===
-Success: no issues found in 57 source files
+Success: no issues found in 60 source files
 === alembic upgrade head ===
 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
 INFO  [alembic.runtime.migration] Will assume transactional DDL.
@@ -26,4 +24,8 @@ INFO  [alembic.runtime.migration] Running upgrade 0005_comments -> 0006_media, C
 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
 INFO  [alembic.runtime.migration] Will assume transactional DDL.
 0006_media (head)
-All Phase 6 checks passed.
+=== python -m arq app.jobs.worker.WorkerSettings --burst ===
+11:56:23: Starting worker for 4 functions: delete_remote_media, verify_media, sweep_orphans, purge_expired_refresh_tokens
+11:56:23: redis_version=7.4.10 mem_usage=1.13M clients_connected=2 db_keys=1
+{"timestamp": "2026-10-29T06:26:23.443057+00:00", "level": "INFO", "logger": "app.jobs.worker", "message": "ARQ worker started", "request_id": null, "jobs": [{"name": "delete_remote_media", "max_tries": 5}, {"name": "verify_media", "max_tries": 3}, {"name": "sweep_orphans", "max_tries": 1}, {"name": "purge_expired_refresh_tokens", "max_tries": 1}], "cron_jobs": [{"name": "sweep_orphans", "schedule": "hourly at minute 0"}, {"name": "purge_expired_refresh_tokens", "schedule": "daily at 03:00"}]}
+All Phase 7 checks passed.

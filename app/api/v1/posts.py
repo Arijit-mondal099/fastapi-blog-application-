@@ -3,12 +3,13 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.deps import CurrentUser, get_optional_current_user, require_role
 from app.db.session import get_db_session
+from app.jobs.queue import JobQueue, get_job_queue
 from app.models.post import Post
 from app.models.user import Role
 from app.repositories.media import MediaRepository
@@ -24,6 +25,7 @@ router = APIRouter(tags=["posts"])
 
 def get_post_service(
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    queue: Annotated[JobQueue, Depends(get_job_queue)],
 ) -> PostService:
     """Build the post service for one request."""
     posts = PostRepository(session)
@@ -35,6 +37,7 @@ def get_post_service(
             posts=posts,
             session=session,
             settings=get_settings(),
+            queue=queue,
         ),
         session=session,
     )
@@ -146,6 +149,7 @@ async def archive_post(
 @router.delete("/posts/{post_id}", status_code=204)
 async def delete_post(
     post_id: UUID,
+    request: Request,
     actor: Annotated[CurrentUser, Depends(require_role(Role.author))],
     service: Annotated[PostService, Depends(get_post_service)],
 ) -> Response:
@@ -154,6 +158,7 @@ async def delete_post(
         actor_id=actor.id,
         actor_role=actor.role,
         post_id=post_id,
+        request_id=getattr(request.state, "request_id", None),
     )
     return Response(status_code=204)
 

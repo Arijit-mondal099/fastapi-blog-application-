@@ -39,6 +39,17 @@ class Settings(BaseSettings):
     imagekit_private_key: SecretStr = SecretStr("")
     imagekit_url_endpoint: str = ""
 
+    media_allowed_mime_types: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/gif",
+            "image/avif",
+        ]
+    )
+    media_max_size_bytes: int = 10 * 1024 * 1024
+
     @field_validator("admin_emails", mode="before")
     @classmethod
     def _split_admin_emails(cls, value: str | list[str]) -> list[str]:
@@ -46,6 +57,14 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [email.strip() for email in value.split(",") if email.strip()]
         return value
+
+    @field_validator("media_allowed_mime_types", mode="before")
+    @classmethod
+    def _split_media_mime_types(cls, value: str | list[str]) -> list[str]:
+        """Accept a comma-separated MIME allow-list from the environment."""
+        if isinstance(value, str):
+            return [mime.strip().lower() for mime in value.split(",") if mime.strip()]
+        return [mime.strip().lower() for mime in value]
 
     def validate_startup(self) -> None:
         """Refuse to start with a weak or placeholder signing secret."""

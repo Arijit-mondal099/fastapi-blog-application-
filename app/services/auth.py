@@ -137,6 +137,17 @@ class AuthService:
             raise AuthenticationError()
         return user
 
+    async def purge_expired_refresh_tokens(self) -> int:
+        """Delete expired tokens and revoked tokens past the retention window."""
+        now = self._clock()
+        revoked_before = now - timedelta(days=self._settings.refresh_token_ttl_days)
+        deleted = await self._refresh_tokens.purge_expired(
+            now=now,
+            revoked_before=revoked_before,
+        )
+        await self._session.commit()
+        return deleted
+
     def _is_admin_email(self, email: str) -> bool:
         normalized = email.casefold()
         return any(

@@ -71,6 +71,24 @@ class FakeRedis:
         return None
 
 
+class FakeJobQueue:
+    """Recording job queue used by HTTP and job tests."""
+
+    def __init__(self) -> None:
+        self.jobs: list[tuple[str, tuple[object, ...], str | None]] = []
+        self.fail = False
+
+    async def enqueue(
+        self,
+        function: str,
+        *args: object,
+        request_id: str | None = None,
+    ) -> None:
+        if self.fail:
+            raise RedisConnectionError("redis unavailable")
+        self.jobs.append((function, args, request_id))
+
+
 def cookie_value(response: httpx.Response, name: str) -> str:
     """Extract a cookie value from a Set-Cookie header."""
     prefix = f"{name}="

@@ -34,3 +34,8 @@ supplied with that task because these ADR files remain absent.
 
 Phase 6 (media and ImageKit upload) also proceeded against the decision index
 and the rules supplied with that task because these ADR files remain absent.
+
+Phase 7 (background jobs and the media outbox) also proceeded against the
+decision index and the rules supplied with that task because these ADR files
+remain absent. The task confirmed the ARQ choice and the outbox pattern for
+media deletion; no ADR file was created.

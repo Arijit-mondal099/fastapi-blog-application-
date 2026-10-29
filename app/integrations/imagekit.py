@@ -84,6 +84,18 @@ class ImageKitClient:
             file_path=path_value if isinstance(path_value, str) else None,
         )
 
+    async def delete_file(self, file_id: str) -> None:
+        """Delete a file; an already-missing file counts as success."""
+        encoded_id = quote(file_id, safe="")
+        try:
+            response = await self._delete(f"{IMAGEKIT_API_BASE_URL}/v1/files/{encoded_id}")
+        except httpx.HTTPError as exc:
+            raise ImageKitClientError("ImageKit request failed") from exc
+
+        if response.status_code in {200, 204, 404}:
+            return
+        raise ImageKitClientError(f"ImageKit returned status {response.status_code}")
+
     async def _get(self, url: str) -> httpx.Response:
         auth = httpx.BasicAuth(
             self._settings.imagekit_private_key.get_secret_value(),
@@ -93,6 +105,16 @@ class ImageKitClient:
             return await self._http_client.get(url, auth=auth)
         async with httpx.AsyncClient(timeout=10.0, auth=auth) as client:
             return await client.get(url)
+
+    async def _delete(self, url: str) -> httpx.Response:
+        auth = httpx.BasicAuth(
+            self._settings.imagekit_private_key.get_secret_value(),
+            "",
+        )
+        if self._http_client is not None:
+            return await self._http_client.delete(url, auth=auth)
+        async with httpx.AsyncClient(timeout=10.0, auth=auth) as client:
+            return await client.delete(url)
 
 
 @lru_cache

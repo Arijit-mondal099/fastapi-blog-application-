@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.refresh_token import RefreshToken
@@ -57,3 +57,23 @@ class RefreshTokenRepository:
         token.revoked_at = revoked_at
         token.replaced_by = replaced_by
         await self._session.flush()
+
+    async def purge_expired(
+        self,
+        *,
+        now: datetime,
+        revoked_before: datetime,
+    ) -> int:
+        """Delete expired rows and revoked rows older than the retention window."""
+        result = await self._session.execute(
+            delete(RefreshToken).where(
+                or_(
+                    RefreshToken.expires_at < now,
+                    and_(
+                        RefreshToken.revoked_at.is_not(None),
+                        RefreshToken.revoked_at < revoked_before,
+                    ),
+                )
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)

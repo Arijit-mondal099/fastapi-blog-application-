@@ -20,6 +20,8 @@ ENV_VALUES = {
     "IMAGEKIT_PUBLIC_KEY": "test-imagekit-public-key",
     "IMAGEKIT_PRIVATE_KEY": "test-imagekit-private-key",
     "IMAGEKIT_URL_ENDPOINT": "https://ik.imagekit.io/test",
+    "MEDIA_ALLOWED_MIME_TYPES": "image/jpeg, image/png",
+    "MEDIA_MAX_SIZE_BYTES": "2048",
 }
 
 
@@ -46,3 +48,5 @@ def test_settings_load_from_env(monkeypatch) -> None:
     assert settings.imagekit_public_key == "test-imagekit-public-key"
     assert settings.imagekit_private_key.get_secret_value() == "test-imagekit-private-key"
     assert settings.imagekit_url_endpoint == "https://ik.imagekit.io/test"
+    assert settings.media_allowed_mime_types == ["image/jpeg", "image/png"]
+    assert settings.media_max_size_bytes == 2048

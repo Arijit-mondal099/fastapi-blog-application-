@@ -17,6 +17,7 @@ Terms used consistently across code, API, and docs. Updated as decisions are mad
 | **Media** | An image stored in ImageKit, recorded in our DB by ImageKit `file_id` and URL, owned by the User who uploaded it. |
 | **Upload auth** | Short-lived signature, token and expiry issued by the backend so the browser can upload directly to ImageKit. |
 | **Orphaned media** | Media not referenced by any Post or User after a grace period (24h). Deleted by a background job. |
+| **Outbox** | A durable state written in the same DB transaction as the change that requires a remote side effect. For Media deletion, `pending_delete` is the outbox state; a Job performs the ImageKit delete after commit, and a periodic sweep re-enqueues unfinished rows. |
 | **Job** | A unit of background work executed by the ARQ worker, with retries. Enqueued by the API or by a cron schedule. |
 | **Worker** | The separate ARQ process that runs Jobs. Shares models and DB session code with the API. |
 | **Post** | A blog article owned by exactly one Author. Lifecycle: `draft` → `published` → `archived`. Has a unique slug. |
