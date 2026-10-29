@@ -7,7 +7,7 @@ Read `docs/ARCHITECTURE.md` and `docs/CONTEXT.md` before changing code. Decision
 
 FastAPI blog backend: multi-author posts, Google sign-in, cookie-based JWT access and refresh tokens, ImageKit media via direct browser upload, ARQ background jobs on Redis, PostgreSQL via async SQLAlchemy 2.x and Alembic.
 
-Status: Phases 0-3 implemented (skeleton, auth, roles/admin, posts and tags). Media, search, comments, and other later phases are pending. Commands below are the target setup. If one doesn't exist yet, say so and don't invent output.
+Status: Phases 0-5 implemented (skeleton, auth, roles/admin, posts and tags, search, comments). Media, background jobs, and other later phases are pending. Commands below are the target setup. If one doesn't exist yet, say so and don't invent output.
 
 ## Commands
 

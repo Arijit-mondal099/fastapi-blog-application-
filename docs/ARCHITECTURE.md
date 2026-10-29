@@ -103,12 +103,12 @@ comments                                      -- flat, no threading
   post_id         uuid fk posts on delete cascade
   author_id       uuid fk users
   body            text not null
-  created_at
+  created_at, updated_at
 ```
 
-Indexes that matter: `posts(status, published_at desc, id)` for cursor pagination; GIN on `search_vector`; `posts(author_id)`; `comments(post_id, created_at)`; `refresh_tokens(family_id)`; `media(status, created_at)` for the orphan sweep.
+Indexes that matter: `posts(status, published_at desc, id)` for cursor pagination; GIN on `search_vector`; `posts(author_id)`; `comments(post_id, created_at, id)` for comment listing; `comments(author_id)`; `refresh_tokens(family_id)`; `media(status, created_at)` for the orphan sweep.
 
-Phase 3 implements `posts`, `tags`, and `post_tags`. Phase 4 adds `search_vector`, its GIN index, and the trigger that maintains it. `cover_media_id` arrives with media (Phase 6).
+Phase 3 implements `posts`, `tags`, and `post_tags`. Phase 4 adds `search_vector`, its GIN index, and the trigger that maintains it. Phase 5 implements `comments`. `cover_media_id` arrives with media (Phase 6).
 
 Open schema question: `media.status` includes `pending_delete` for the outbox pattern (ADR-0007), which is still a proposal.
 
@@ -158,6 +158,13 @@ Open schema question: `media.status` includes `pending_delete` for the outbox pa
 - `GET /admin/users`: admin only, cursor pagination on `(created_at, id)` newest first, returning `id`, `email`, `name`, and `role`. Never returns `google_sub`.
 - `PATCH /admin/users/{id}/role`: admin only. The caller's role is re-read from the DB rather than trusted from the access token. Self-demotion returns 409, an unknown user returns 404, and a same-role change is a 200 no-op.
 - A real role change updates the user and revokes every refresh-token family for that user in one transaction, then emits a structured audit log line with `actor_id`, `target_id`, `old_role`, and `new_role`. Access tokens still run until their normal expiry.
+
+### 4.8 Comments (Phase 5)
+- `GET /posts/{slug}/comments`: public for a post the caller can see. Cursor pagination on `(created_at, id)` ascending, oldest first; the cursor is opaque. `limit` defaults to 20 and is capped at 50. On a draft or archived post, only the post author or an Admin gets a page; every other caller gets 404.
+- `POST /posts/{slug}/comments`: any signed-in user. The body is trimmed plain text of 1 to 2000 characters; empty or over-long bodies return 422. It is stored and returned verbatim, never rendered as HTML.
+- Comments can be created only on published posts. A draft or archived slug returns 404 to every caller on create, including the post author and an Admin. Anonymous callers get 401 from authentication before the post is resolved.
+- `DELETE /comments/{id}`: the comment author, the post author, or an Admin; every other signed-in caller gets 403. The delete is hard. A deleted comment returns 404 to everyone afterward.
+- Deleting a Post cascades to its comments through the foreign key.
 
 ## 5. Background jobs (ADR-0007)
 

@@ -93,6 +93,21 @@ class InvalidSearchQuery(AppError):
     default_detail = "Search query must be between 1 and 200 characters"
 
 
+class CommentNotFound(AppError):
+    status_code = 404
+    default_detail = "Comment not found"
+
+
+class CommentForbidden(AppError):
+    status_code = 403
+    default_detail = "Forbidden"
+
+
+class InvalidCommentBody(AppError):
+    status_code = 422
+    default_detail = "Comment body must be between 1 and 2000 characters"
+
+
 class CannotDemoteSelf(AppError):
     status_code = 409
     default_detail = "Admins cannot demote themselves"

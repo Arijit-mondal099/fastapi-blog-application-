@@ -32,6 +32,18 @@ class PostPage:
     next_cursor: str | None
 
 
+def is_post_visible(
+    post: Post,
+    *,
+    viewer_id: UUID | None,
+    viewer_role: Role | None,
+) -> bool:
+    """Return whether a viewer may see a post, including unpublished posts."""
+    if post.status is PostStatus.published:
+        return True
+    return viewer_id is not None and (post.author_id == viewer_id or viewer_role is Role.admin)
+
+
 class PostService:
     """Application rules for post reads and writes."""
 
@@ -156,13 +168,13 @@ class PostService:
     ) -> Post:
         """Return a published post, or an unpublished one to its owner/admin."""
         post = await self._posts.get_by_slug(slug)
-        if post is None:
+        if post is None or not is_post_visible(
+            post,
+            viewer_id=viewer_id,
+            viewer_role=viewer_role,
+        ):
             raise PostNotFound()
-        if post.status is PostStatus.published:
-            return post
-        if viewer_id is not None and (post.author_id == viewer_id or viewer_role is Role.admin):
-            return post
-        raise PostNotFound()
+        return post
 
     async def list_public(
         self,

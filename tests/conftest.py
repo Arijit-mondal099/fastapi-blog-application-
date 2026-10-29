@@ -70,7 +70,7 @@ async def db_engine(postgres_url: str) -> AsyncIterator[AsyncEngine]:
     async with engine.begin() as connection:
         await connection.execute(
             text(
-                "TRUNCATE TABLE post_tags, posts, tags, refresh_tokens, users "
+                "TRUNCATE TABLE post_tags, posts, tags, comments, refresh_tokens, users "
                 "RESTART IDENTITY CASCADE"
             )
         )
